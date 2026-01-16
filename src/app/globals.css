@@ -24,3 +24,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Hide Supabase dev tools badge and Next.js dev indicators */
+[data-supabase-badge],
+.supabase-badge,
+iframe[src*="supabase"],
+[data-nextjs-dialog],
+[data-nextjs-dialog-overlay],
+button[data-nextjs-toast],
+#__next-build-watcher,
+nextjs-portal {
+  display: none !important;
+}

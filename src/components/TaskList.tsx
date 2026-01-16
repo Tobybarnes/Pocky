@@ -1,0 +1,228 @@
+'use client'
+
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Task, Project } from '@/types/database'
+import SchedulePicker, { Schedule } from './SchedulePicker'
+
+interface TaskListProps {
+  title: string
+  icon: string
+  tasks: Task[]
+  projects: Project[]
+  onToggleTask: (taskId: string, completed: boolean) => void
+  onScheduleTask: (taskId: string, schedule: Schedule) => void
+  onAddTask: () => void
+  onTaskClick: (task: Task) => void
+  onDeleteTask: (taskId: string) => void
+  highlightedTaskId?: string | null
+}
+
+const scheduleDisplay: Record<string, { icon: string; color: string }> = {
+  today: { icon: '⭐', color: 'text-amber-500' },
+  this_week: { icon: '📆', color: 'text-blue-500' },
+  next_week: { icon: '📅', color: 'text-purple-500' },
+  anytime: { icon: '📋', color: 'text-emerald-500' },
+  someday: { icon: '📦', color: 'text-amber-300' },
+}
+
+export default function TaskList({ title, icon, tasks, projects, onToggleTask, onScheduleTask, onAddTask, onTaskClick, onDeleteTask, highlightedTaskId }: TaskListProps) {
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
+
+  return (
+    <div className="flex-1 bg-white overflow-auto">
+      {/* Header */}
+      <header className="p-8 pb-4">
+        <h1 className="text-3xl font-bold text-stone-800 flex items-center gap-3">
+          <span>{icon}</span>
+          {title}
+        </h1>
+      </header>
+
+      {/* Task List */}
+      <div className="px-8">
+        <AnimatePresence mode="popLayout">
+          {tasks.length === 0 ? (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-stone-400 py-8 text-center"
+            >
+              No tasks here yet
+            </motion.p>
+          ) : (
+            <ul className="space-y-3">
+              {tasks.map((task, index) => {
+                const isHighlighted = highlightedTaskId === task.id
+                return (
+                <motion.li
+                  key={task.id}
+                  layout
+                  layoutId={`tasklist-${task.id}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    scale: isHighlighted ? [1, 1.02, 1] : 1
+                  }}
+                  exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
+                  transition={{
+                    layout: { type: 'spring', stiffness: 350, damping: 25 },
+                    duration: 0.3,
+                    delay: index * 0.02
+                  }}
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggingTaskId(task.id)
+                    // @ts-expect-error - React DragEvent type mismatch
+                    e.dataTransfer.setData('taskId', task.id)
+                    // @ts-expect-error - React DragEvent type mismatch
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragEnd={() => setDraggingTaskId(null)}
+                  className={`flex items-start gap-3 p-4 rounded-xl bg-white border border-stone-200 group cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset transition-all hover:shadow-md hover:border-stone-300 ${
+                    isHighlighted ? 'bg-yellow-50 ring-2 ring-yellow-400 border-yellow-400' : ''
+                  } ${draggingTaskId === task.id ? 'opacity-50 scale-[0.98] shadow-lg ring-2 ring-blue-400' : ''}`}
+                  onClick={() => onTaskClick(task)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onTaskClick(task)
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    onTaskClick(task)
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Task: ${task.title}${task.status === 'completed' ? ' (completed)' : ''}`}
+                >
+                  {/* Checkbox with animation */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleTask(task.id, task.status !== 'completed')
+                    }}
+                    className="flex-shrink-0 -m-2 p-2 flex items-center justify-center"
+                    aria-label={task.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
+                    aria-pressed={task.status === 'completed'}
+                  >
+                    <motion.span
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        task.status === 'completed'
+                          ? 'bg-blue-500 border-blue-500'
+                          : 'border-stone-300 hover:border-blue-400'
+                      }`}
+                      whileTap={{ scale: 0.9 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                    >
+                      <AnimatePresence>
+                        {task.status === 'completed' && (
+                          <motion.svg
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                            className="w-3 h-3 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </motion.svg>
+                        )}
+                      </AnimatePresence>
+                    </motion.span>
+                  </button>
+
+                  {/* Schedule Badge - Left side, always visible */}
+                  <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSelectedTaskId(selectedTaskId === task.id ? null : task.id)}
+                      className={`flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
+                        task.schedule
+                          ? `${scheduleDisplay[task.schedule]?.color} bg-stone-100 hover:bg-stone-200`
+                          : 'text-stone-300 bg-stone-50 hover:bg-stone-100 hover:text-stone-500'
+                      }`}
+                      aria-label={task.schedule ? `Scheduled: ${task.schedule.replace('_', ' ')}` : 'Schedule task'}
+                      aria-expanded={selectedTaskId === task.id}
+                      aria-haspopup="listbox"
+                    >
+                      {task.schedule ? (
+                        <span className="text-sm" aria-hidden="true">{scheduleDisplay[task.schedule]?.icon}</span>
+                      ) : (
+                        <span className="text-sm" aria-hidden="true">📅</span>
+                      )}
+                    </motion.button>
+
+                    {/* Schedule Picker Dropdown */}
+                    <AnimatePresence>
+                      {selectedTaskId === task.id && (
+                        <SchedulePicker
+                          currentSchedule={task.schedule as Schedule}
+                          onSelect={(schedule) => onScheduleTask(task.id, schedule)}
+                          onClose={() => setSelectedTaskId(null)}
+                        />
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Task Content */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-stone-800 transition-all duration-300 ${task.status === 'completed' ? 'line-through text-stone-400' : ''}`}>
+                      {task.title}
+                    </p>
+                    {task.project_id && (
+                      <p className="text-xs text-stone-400 mt-0.5">
+                        {projects.find(p => p.id === task.project_id)?.name}
+                      </p>
+                    )}
+                    {task.notes && (
+                      <p className="text-sm text-stone-400 truncate mt-0.5">{task.notes}</p>
+                    )}
+                    {task.deadline && (
+                      <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                        <span>🚩</span>
+                        {new Date(task.deadline).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Delete Button - appears on hover */}
+                  <motion.button
+                    initial={{ opacity: 0 }}
+                    whileHover={{ scale: 1.1, backgroundColor: 'rgba(254, 202, 202, 0.5)' }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDeleteTask(task.id)
+                    }}
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 flex-shrink-0 min-w-[44px] min-h-[44px] -m-2 flex items-center justify-center text-stone-300 hover:text-red-500 rounded transition-opacity"
+                    aria-label="Delete task"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </motion.button>
+                </motion.li>
+              )})}
+            </ul>
+          )}
+        </AnimatePresence>
+
+        {/* Add Task Button */}
+        <button
+          onClick={onAddTask}
+          className="flex items-center gap-2 px-3 py-3 text-stone-400 hover:text-blue-500 transition-colors mt-4"
+        >
+          <span className="text-xl">+</span>
+          <span>New Task</span>
+        </button>
+      </div>
+    </div>
+  )
+}
