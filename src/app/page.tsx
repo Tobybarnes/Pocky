@@ -9,6 +9,7 @@ import TaskModal from '@/components/TaskModal'
 import TaskDetailModal from '@/components/TaskDetailModal'
 import { Task, Project, Area, Heading } from '@/types/database'
 import { seedTasks, seedProjects } from '@/lib/seedData'
+import { generateEmoji } from '@/utils/emoji'
 
 // Keyboard shortcuts configuration
 const keyboardShortcuts = [
@@ -457,6 +458,14 @@ export default function Home() {
       default:
         return false
     }
+  }).sort((a, b) => {
+    // Sort logbook by most recently completed/updated first
+    if (activeView === 'logbook') {
+      const aDate = a.completed_at || a.updated_at
+      const bDate = b.completed_at || b.updated_at
+      return new Date(bDate).getTime() - new Date(aDate).getTime()
+    }
+    return 0
   })
 
   // Get headings for current project
@@ -471,6 +480,7 @@ export default function Home() {
       user_id: 'demo',
       area_id: areaId || null,
       name,
+      emoji: generateEmoji(name),
       notes: null,
       position: projects.length,
       status: 'active',
@@ -483,6 +493,14 @@ export default function Home() {
     setActiveView(`project:${newProject.id}`)
   }
 
+  function handleUpdateProjectEmoji(projectId: string, emoji: string) {
+    setProjects(projects.map(project =>
+      project.id === projectId
+        ? { ...project, emoji, updated_at: new Date().toISOString() }
+        : project
+    ))
+  }
+
   function handleAddTask(taskData: { title: string; notes: string; deadline: string | null }) {
     const isProjectView = activeView.startsWith('project:')
     const projectId = isProjectView ? activeView.replace('project:', '') : null
@@ -493,6 +511,7 @@ export default function Home() {
       project_id: projectId,
       heading_id: addingTaskHeadingId || null,
       title: taskData.title,
+      emoji: generateEmoji(taskData.title),
       notes: taskData.notes || null,
       status: 'active',
       schedule: activeView === 'today' ? 'today' :
@@ -510,6 +529,14 @@ export default function Home() {
     setTasks([...tasks, newTask])
     setIsAddingTask(false)
     setAddingTaskHeadingId(undefined)
+  }
+
+  function handleUpdateTaskEmoji(taskId: string, emoji: string) {
+    setTasks(tasks.map(task =>
+      task.id === taskId
+        ? { ...task, emoji, updated_at: new Date().toISOString() }
+        : task
+    ))
   }
 
   function handleAddHeading(name: string) {
@@ -601,6 +628,23 @@ export default function Home() {
     ))
   }
 
+  function handleMoveTaskToSchedule(taskId: string, schedule: 'today' | 'this_week' | 'next_week' | 'anytime' | 'someday') {
+    setTasks(tasks.map(task =>
+      task.id === taskId
+        ? { ...task, schedule, updated_at: new Date().toISOString() }
+        : task
+    ))
+  }
+
+  function handleSnoozeAllToNextWeek() {
+    // Move all tasks from this_week to next_week
+    setTasks(tasks.map(task =>
+      task.schedule === 'this_week' && task.status !== 'completed'
+        ? { ...task, schedule: 'next_week', updated_at: new Date().toISOString() }
+        : task
+    ))
+  }
+
   function handleReorderProjects(reorderedProjects: Project[]) {
     setProjects(prev => {
       // Get IDs of reordered projects
@@ -618,6 +662,7 @@ export default function Home() {
       user_id: 'demo',
       area_id: null,
       name: task.title,
+      emoji: task.emoji || generateEmoji(task.title),
       notes: task.notes,
       position: projects.length,
       status: 'active',
@@ -681,7 +726,9 @@ export default function Home() {
         onCreateProject={handleCreateProject}
         onDeleteProject={handleDeleteProject}
         onMoveTaskToProject={handleMoveTaskToProject}
+        onMoveTaskToSchedule={handleMoveTaskToSchedule}
         onReorderProjects={handleReorderProjects}
+        onUpdateProjectEmoji={handleUpdateProjectEmoji}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -703,6 +750,8 @@ export default function Home() {
             onReorderTasks={handleReorderTasks}
             onDeleteProject={() => handleDeleteProject(currentProject.id)}
             highlightedTaskId={highlightedTaskId}
+            onUpdateTaskEmoji={handleUpdateTaskEmoji}
+            onUpdateProjectEmoji={handleUpdateProjectEmoji}
           />
         ) : (
           <TaskList
@@ -716,6 +765,9 @@ export default function Home() {
             onTaskClick={setSelectedTask}
             onDeleteTask={handleDeleteTask}
             highlightedTaskId={highlightedTaskId}
+            onUpdateTaskEmoji={handleUpdateTaskEmoji}
+            showSnoozeButton={activeView === 'this_week'}
+            onSnoozeAll={handleSnoozeAllToNextWeek}
           />
         )}
 

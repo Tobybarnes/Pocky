@@ -3,8 +3,12 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { Project, Area, Task } from '@/types/database'
+import { generateEmoji } from '@/utils/emoji'
+import EmojiPicker from './EmojiPicker'
 
 export type View = 'today' | 'this_week' | 'next_week' | 'anytime' | 'someday' | 'logbook' | `project:${string}`
+
+type Schedule = 'today' | 'this_week' | 'next_week' | 'anytime' | 'someday'
 
 interface SidebarProps {
   activeView: View
@@ -15,7 +19,9 @@ interface SidebarProps {
   onCreateProject: (name: string, areaId?: string) => void
   onDeleteProject: (projectId: string) => void
   onMoveTaskToProject: (taskId: string, projectId: string) => void
+  onMoveTaskToSchedule: (taskId: string, schedule: Schedule) => void
   onReorderProjects?: (projects: Project[]) => void
+  onUpdateProjectEmoji?: (projectId: string, emoji: string) => void
 }
 
 const navItems: { id: View; label: string; icon: string; color?: string; shortcut: string }[] = [
@@ -91,14 +97,18 @@ export default function Sidebar({
   onCreateProject,
   onDeleteProject,
   onMoveTaskToProject,
-  onReorderProjects
+  onMoveTaskToSchedule,
+  onReorderProjects,
+  onUpdateProjectEmoji
 }: SidebarProps) {
   const [isAddingProject, setIsAddingProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null)
   const [dragOverProject, setDragOverProject] = useState<string | null>(null)
+  const [dragOverSchedule, setDragOverSchedule] = useState<string | null>(null)
   const [projectsCollapsed, setProjectsCollapsed] = useState(false)
   const [scheduleCollapsed, setScheduleCollapsed] = useState(false)
+  const [emojiPickerProjectId, setEmojiPickerProjectId] = useState<string | null>(null)
 
   // Load collapsed state from localStorage
   useEffect(() => {
@@ -162,10 +172,13 @@ export default function Sidebar({
   return (
     <aside className="w-64 bg-stone-100 h-screen flex flex-col border-r border-stone-200">
       {/* Logo */}
-      <div className="p-4 pt-6 flex items-center gap-2">
+      <button
+        onClick={() => onViewChange('today')}
+        className="p-4 pt-6 flex items-center gap-2 hover:opacity-80 transition-opacity"
+      >
         <img src="/logo.png" alt="Pocky" className="w-8 h-8" />
         <h1 className="text-xl font-semibold text-stone-800">Pocky</h1>
-      </div>
+      </button>
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3 overflow-y-auto">
@@ -195,7 +208,7 @@ export default function Sidebar({
                     axis="y"
                     values={standaloneProjects}
                     onReorder={handleReorder}
-                    className="space-y-1"
+                    className="space-y-2"
                   >
                     {standaloneProjects.map((project) => (
                       <Reorder.Item
@@ -203,37 +216,77 @@ export default function Sidebar({
                         value={project}
                         className="list-none"
                       >
-                        <motion.button
-                          onClick={() => onViewChange(`project:${project.id}`)}
-                          onContextMenu={(e) => handleProjectContextMenu(e, project.id)}
+                        <motion.div
                           onDragOver={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
-                            console.log('Sidebar dragOver:', project.id)
                             setDragOverProject(project.id)
                           }}
                           onDragLeave={() => setDragOverProject(null)}
                           onDrop={(e) => {
                             e.preventDefault()
                             const taskId = e.dataTransfer.getData('taskId')
-                            console.log('Sidebar drop:', taskId, '->', project.id)
                             if (taskId) {
                               onMoveTaskToProject(taskId, project.id)
                             }
                             setDragOverProject(null)
                           }}
-                          whileTap={{ scale: 0.98 }}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all cursor-grab active:cursor-grabbing ${
+                          animate={dragOverProject === project.id ? {
+                            scale: 1.02,
+                            paddingTop: 16,
+                            paddingBottom: 16,
+                            marginTop: 8,
+                            marginBottom: 8,
+                          } : { scale: 1, paddingTop: 8, paddingBottom: 8, marginTop: 0, marginBottom: 0 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                          style={dragOverProject === project.id ? {
+                            boxShadow: '0 0 12px rgba(59, 130, 246, 0.25)'
+                          } : undefined}
+                          className={`w-full flex items-center gap-2 px-3 rounded-xl text-left border transition-colors relative ${
                             activeView === `project:${project.id}`
-                              ? 'bg-white shadow-sm text-stone-900'
-                              : dragOverProject === project.id
-                              ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-400 ring-inset scale-[1.02]'
-                              : 'text-stone-600 hover:bg-stone-200/50'
+                              ? 'bg-white border-stone-200 shadow-sm text-stone-900'
+                              : 'bg-stone-100 border-stone-200/50 text-stone-600 hover:bg-stone-50 hover:border-stone-200'
                           }`}
                         >
-                          <ProgressCircle progress={getProjectProgress(project.id)} />
-                          <span className="font-medium truncate text-stone-700">{project.name}</span>
-                        </motion.button>
+                          {/* Emoji button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEmojiPickerProjectId(emojiPickerProjectId === project.id ? null : project.id)
+                            }}
+                            className="flex-shrink-0 text-xl hover:scale-110 transition-transform"
+                            title="Click to change emoji"
+                          >
+                            {project.emoji || generateEmoji(project.name)}
+                          </button>
+
+                          {/* Emoji Picker */}
+                          <AnimatePresence>
+                            {emojiPickerProjectId === project.id && onUpdateProjectEmoji && (
+                              <EmojiPicker
+                                currentEmoji={project.emoji || generateEmoji(project.name)}
+                                onSelect={(emoji) => {
+                                  onUpdateProjectEmoji(project.id, emoji)
+                                  setEmojiPickerProjectId(null)
+                                }}
+                                onClose={() => setEmojiPickerProjectId(null)}
+                              />
+                            )}
+                          </AnimatePresence>
+
+                          {/* Project name - clickable for navigation */}
+                          <button
+                            onClick={() => onViewChange(`project:${project.id}`)}
+                            onContextMenu={(e) => handleProjectContextMenu(e, project.id)}
+                            className="flex-1 font-medium truncate text-stone-700 text-left"
+                          >
+                            {project.name}
+                          </button>
+
+                          {dragOverProject === project.id && (
+                            <span className="text-xs text-stone-400">+</span>
+                          )}
+                        </motion.div>
                       </Reorder.Item>
                     ))}
                   </Reorder.Group>
@@ -270,24 +323,55 @@ export default function Sidebar({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <ul className="space-y-1">
-                  {navItems.map((item) => (
+                <ul className="space-y-2">
+                  {navItems.map((item) => {
+                    const isDroppable = item.id !== 'logbook'
+                    return (
                     <li key={item.id}>
                       <motion.button
                         onClick={() => onViewChange(item.id)}
+                        onDragOver={isDroppable ? (e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setDragOverSchedule(item.id)
+                        } : undefined}
+                        onDragLeave={isDroppable ? () => setDragOverSchedule(null) : undefined}
+                        onDrop={isDroppable ? (e) => {
+                          e.preventDefault()
+                          const taskId = e.dataTransfer.getData('taskId')
+                          if (taskId && item.id !== 'logbook') {
+                            onMoveTaskToSchedule(taskId, item.id as Schedule)
+                          }
+                          setDragOverSchedule(null)
+                        } : undefined}
+                        animate={dragOverSchedule === item.id ? {
+                          scale: 1.02,
+                          paddingTop: 16,
+                          paddingBottom: 16,
+                          marginTop: 4,
+                          marginBottom: 4,
+                        } : { scale: 1, paddingTop: 8, paddingBottom: 8, marginTop: 0, marginBottom: 0 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                         whileTap={{ scale: 0.98 }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors group ${
+                        style={dragOverSchedule === item.id ? {
+                          boxShadow: '0 0 12px rgba(59, 130, 246, 0.25)'
+                        } : undefined}
+                        className={`w-full flex items-center gap-3 px-3 rounded-xl text-left border transition-colors group ${
                           activeView === item.id
-                            ? 'bg-white shadow-sm text-stone-900'
-                            : 'text-stone-600 hover:bg-stone-200/50'
+                            ? 'bg-white border-stone-200 shadow-sm text-stone-900'
+                            : 'bg-stone-100 border-stone-200/50 text-stone-600 hover:bg-stone-50 hover:border-stone-200'
                         }`}
                       >
                         <span className={item.color}>{item.icon}</span>
                         <span className="font-medium flex-1">{item.label}</span>
-                        <span className="text-xs text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity">{item.shortcut}</span>
+                        {dragOverSchedule === item.id ? (
+                          <span className="text-xs text-stone-400">+</span>
+                        ) : (
+                          <span className="text-xs text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity">{item.shortcut}</span>
+                        )}
                       </motion.button>
                     </li>
-                  ))}
+                  )})}
                 </ul>
               </motion.div>
             )}

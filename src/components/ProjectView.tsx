@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Task, Project, Heading } from '@/types/database'
 import SchedulePicker, { Schedule } from './SchedulePicker'
+import EmojiPicker from './EmojiPicker'
+import { generateEmoji } from '@/utils/emoji'
 
 type SortOption = 'manual' | 'due_date' | 'schedule' | 'title' | 'created'
 
@@ -37,6 +39,8 @@ interface ProjectViewProps {
   onReorderTasks?: (tasks: Task[]) => void
   onDeleteProject?: () => void
   highlightedTaskId?: string | null
+  onUpdateTaskEmoji?: (taskId: string, emoji: string) => void
+  onUpdateProjectEmoji?: (projectId: string, emoji: string) => void
 }
 
 const scheduleDisplay: Record<string, { icon: string; color: string }> = {
@@ -60,11 +64,20 @@ export default function ProjectView({
   onDeleteTask,
   onReorderTasks,
   onDeleteProject,
-  highlightedTaskId
+  highlightedTaskId,
+  onUpdateTaskEmoji,
+  onUpdateProjectEmoji
 }: ProjectViewProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [isAddingHeading, setIsAddingHeading] = useState(false)
+  const [emojiPickerTaskId, setEmojiPickerTaskId] = useState<string | null>(null)
+  const [showProjectEmojiPicker, setShowProjectEmojiPicker] = useState(false)
+
+  // Reset dragging state when tasks change (e.g., after a move)
+  useEffect(() => {
+    setDraggingTaskId(null)
+  }, [tasks])
   const [newHeadingName, setNewHeadingName] = useState('')
   const [isEditingNotes, setIsEditingNotes] = useState(false)
   const [notes, setNotes] = useState(project.notes || '')
@@ -183,23 +196,46 @@ export default function ProjectView({
     setIsEditingNotes(false)
   }
 
+  // Track if a drag occurred to prevent click
+  const dragOccurredRef = useRef(false)
+
   const TaskItem = ({ task }: { task: Task }) => {
     const isHighlighted = highlightedTaskId === task.id
     const isBeingDragged = draggingTaskId === task.id
+
+    const handleClick = (e: React.MouseEvent) => {
+      // Only open task if we didn't just drag
+      if (dragOccurredRef.current) {
+        e.preventDefault()
+        e.stopPropagation()
+        dragOccurredRef.current = false
+        return
+      }
+      onTaskClick(task)
+    }
+
     return (
     <div
       draggable
+      onMouseDown={() => {
+        // Reset drag flag on mouse down
+        dragOccurredRef.current = false
+      }}
       onDragStart={(e) => {
-        console.log('ProjectView drag start:', task.id)
+        dragOccurredRef.current = true
         setDraggingTaskId(task.id)
         e.dataTransfer.setData('taskId', task.id)
         e.dataTransfer.effectAllowed = 'move'
       }}
-      onDragEnd={() => setDraggingTaskId(null)}
-      className={`flex items-start gap-3 p-4 rounded-xl bg-white border border-stone-200 group cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset transition-all hover:shadow-md hover:border-stone-300 select-none ${
+      onDragEnd={() => {
+        setDraggingTaskId(null)
+        // Keep dragOccurredRef true briefly to prevent click
+        setTimeout(() => { dragOccurredRef.current = false }, 50)
+      }}
+      className={`flex items-center gap-3 p-3 rounded-xl bg-white border border-stone-200 group focus:outline-none transition-all hover:shadow-md hover:border-stone-300 select-none ${
         isHighlighted ? 'bg-yellow-50 ring-2 ring-yellow-400 border-yellow-400' : ''
-      } ${isBeingDragged ? 'opacity-50 scale-[0.98] ring-2 ring-blue-400' : ''}`}
-      onClick={() => onTaskClick(task)}
+      } ${isBeingDragged ? 'opacity-40 border-blue-300 bg-blue-50' : ''}`}
+      onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
@@ -214,6 +250,18 @@ export default function ProjectView({
       role="button"
       aria-label={`Task: ${task.title}${task.status === 'completed' ? ' (completed)' : ''}`}
     >
+      {/* Drag Handle */}
+      <div className="flex-shrink-0 text-stone-500 hover:text-stone-700 cursor-grab active:cursor-grabbing p-1 -ml-1">
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="9" cy="5" r="1.5" />
+          <circle cx="9" cy="12" r="1.5" />
+          <circle cx="9" cy="19" r="1.5" />
+          <circle cx="15" cy="5" r="1.5" />
+          <circle cx="15" cy="12" r="1.5" />
+          <circle cx="15" cy="19" r="1.5" />
+        </svg>
+      </div>
+
       {/* Checkbox */}
       <button
         onClick={(e) => {
@@ -266,6 +314,30 @@ export default function ProjectView({
         )}
       </div>
 
+      {/* Task Emoji */}
+      <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => setEmojiPickerTaskId(emojiPickerTaskId === task.id ? null : task.id)}
+          className="text-lg hover:scale-110 transition-transform"
+          title="Click to change emoji"
+        >
+          {task.emoji || generateEmoji(task.title)}
+        </button>
+
+        <AnimatePresence>
+          {emojiPickerTaskId === task.id && onUpdateTaskEmoji && (
+            <EmojiPicker
+              currentEmoji={task.emoji || generateEmoji(task.title)}
+              onSelect={(emoji) => {
+                onUpdateTaskEmoji(task.id, emoji)
+                setEmojiPickerTaskId(null)
+              }}
+              onClose={() => setEmojiPickerTaskId(null)}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* Task Content */}
       <div className="flex-1 min-w-0">
         <p className={`text-stone-800 ${task.status === 'completed' ? 'line-through text-stone-400' : ''}`}>
@@ -303,8 +375,27 @@ export default function ProjectView({
       {/* Header */}
       <header className="p-8 pb-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-stone-800 flex items-center gap-3">
-            <span className="text-blue-500">◉</span>
+          <h1 className="text-3xl font-bold text-stone-800 flex items-center gap-3 relative">
+            {/* Project Emoji */}
+            <button
+              onClick={() => setShowProjectEmojiPicker(!showProjectEmojiPicker)}
+              className="text-3xl hover:scale-110 transition-transform cursor-pointer"
+              title="Click to change emoji"
+            >
+              {project.emoji || generateEmoji(project.name)}
+            </button>
+            <AnimatePresence>
+              {showProjectEmojiPicker && onUpdateProjectEmoji && (
+                <EmojiPicker
+                  currentEmoji={project.emoji || generateEmoji(project.name)}
+                  onSelect={(emoji) => {
+                    onUpdateProjectEmoji(project.id, emoji)
+                    setShowProjectEmojiPicker(false)
+                  }}
+                  onClose={() => setShowProjectEmojiPicker(false)}
+                />
+              )}
+            </AnimatePresence>
             {project.name}
           </h1>
 

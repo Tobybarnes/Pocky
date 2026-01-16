@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Task, Project } from '@/types/database'
 import SchedulePicker, { Schedule } from './SchedulePicker'
+import EmojiPicker from './EmojiPicker'
+import { generateEmoji } from '@/utils/emoji'
 
 interface TaskListProps {
   title: string
@@ -16,6 +18,9 @@ interface TaskListProps {
   onTaskClick: (task: Task) => void
   onDeleteTask: (taskId: string) => void
   highlightedTaskId?: string | null
+  onUpdateTaskEmoji?: (taskId: string, emoji: string) => void
+  onSnoozeAll?: () => void
+  showSnoozeButton?: boolean
 }
 
 const scheduleDisplay: Record<string, { icon: string; color: string }> = {
@@ -26,18 +31,37 @@ const scheduleDisplay: Record<string, { icon: string; color: string }> = {
   someday: { icon: '📦', color: 'text-amber-300' },
 }
 
-export default function TaskList({ title, icon, tasks, projects, onToggleTask, onScheduleTask, onAddTask, onTaskClick, onDeleteTask, highlightedTaskId }: TaskListProps) {
+export default function TaskList({ title, icon, tasks, projects, onToggleTask, onScheduleTask, onAddTask, onTaskClick, onDeleteTask, highlightedTaskId, onUpdateTaskEmoji, onSnoozeAll, showSnoozeButton }: TaskListProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
+  const [emojiPickerTaskId, setEmojiPickerTaskId] = useState<string | null>(null)
+
+  // Reset dragging state when tasks change (e.g., after a move)
+  useEffect(() => {
+    setDraggingTaskId(null)
+  }, [tasks])
 
   return (
     <div className="flex-1 bg-white overflow-auto">
       {/* Header */}
       <header className="p-8 pb-4">
-        <h1 className="text-3xl font-bold text-stone-800 flex items-center gap-3">
-          <span>{icon}</span>
-          {title}
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-stone-800 flex items-center gap-3">
+            <span>{icon}</span>
+            {title}
+          </h1>
+          {showSnoozeButton && onSnoozeAll && tasks.length > 0 && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onSnoozeAll}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium"
+            >
+              <span>📅</span>
+              <span>Move all to Next Week</span>
+            </motion.button>
+          )}
+        </div>
       </header>
 
       {/* Task List */}
@@ -167,6 +191,32 @@ export default function TaskList({ title, icon, tasks, projects, onToggleTask, o
                           currentSchedule={task.schedule as Schedule}
                           onSelect={(schedule) => onScheduleTask(task.id, schedule)}
                           onClose={() => setSelectedTaskId(null)}
+                        />
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Task Emoji */}
+                  <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setEmojiPickerTaskId(emojiPickerTaskId === task.id ? null : task.id)}
+                      className="text-lg"
+                      title="Click to change emoji"
+                    >
+                      {task.emoji || generateEmoji(task.title)}
+                    </motion.button>
+
+                    <AnimatePresence>
+                      {emojiPickerTaskId === task.id && onUpdateTaskEmoji && (
+                        <EmojiPicker
+                          currentEmoji={task.emoji || generateEmoji(task.title)}
+                          onSelect={(emoji) => {
+                            onUpdateTaskEmoji(task.id, emoji)
+                            setEmojiPickerTaskId(null)
+                          }}
+                          onClose={() => setEmojiPickerTaskId(null)}
                         />
                       )}
                     </AnimatePresence>

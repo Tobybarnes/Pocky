@@ -41,6 +41,7 @@ export interface Database {
           user_id: string
           area_id: string | null
           name: string
+          emoji: string | null
           notes: string | null
           position: number
           status: 'active' | 'completed' | 'someday'
@@ -54,6 +55,7 @@ export interface Database {
           user_id: string
           area_id?: string | null
           name: string
+          emoji?: string | null
           notes?: string | null
           position?: number
           status?: 'active' | 'completed' | 'someday'
@@ -67,6 +69,7 @@ export interface Database {
           user_id?: string
           area_id?: string | null
           name?: string
+          emoji?: string | null
           notes?: string | null
           position?: number
           status?: 'active' | 'completed' | 'someday'
@@ -106,9 +109,10 @@ export interface Database {
           project_id: string | null
           heading_id: string | null
           title: string
+          emoji: string | null
           notes: string | null
           status: 'inbox' | 'active' | 'completed' | 'cancelled'
-          schedule: 'anytime' | 'today' | 'evening' | 'someday' | null
+          schedule: 'anytime' | 'today' | 'this_week' | 'next_week' | 'evening' | 'someday' | null
           scheduled_date: string | null
           deadline: string | null
           position: number
@@ -122,9 +126,10 @@ export interface Database {
           project_id?: string | null
           heading_id?: string | null
           title: string
+          emoji?: string | null
           notes?: string | null
           status?: 'inbox' | 'active' | 'completed' | 'cancelled'
-          schedule?: 'anytime' | 'today' | 'evening' | 'someday' | null
+          schedule?: 'anytime' | 'today' | 'this_week' | 'next_week' | 'evening' | 'someday' | null
           scheduled_date?: string | null
           deadline?: string | null
           position?: number
@@ -138,9 +143,10 @@ export interface Database {
           project_id?: string | null
           heading_id?: string | null
           title?: string
+          emoji?: string | null
           notes?: string | null
           status?: 'inbox' | 'active' | 'completed' | 'cancelled'
-          schedule?: 'anytime' | 'today' | 'evening' | 'someday' | null
+          schedule?: 'anytime' | 'today' | 'this_week' | 'next_week' | 'evening' | 'someday' | null
           scheduled_date?: string | null
           deadline?: string | null
           position?: number
