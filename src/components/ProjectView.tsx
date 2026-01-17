@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Task, Project, Heading } from '@/types/database'
 import SchedulePicker, { Schedule } from './SchedulePicker'
-import EmojiPicker from './EmojiPicker'
+import NativeEmojiPicker from './NativeEmojiPicker'
 import { generateEmoji } from '@/utils/emoji'
 
 type SortOption = 'manual' | 'due_date' | 'schedule' | 'title' | 'created'
@@ -324,18 +324,17 @@ export default function ProjectView({
           {task.emoji || generateEmoji(task.title)}
         </button>
 
-        <AnimatePresence>
-          {emojiPickerTaskId === task.id && onUpdateTaskEmoji && (
-            <EmojiPicker
-              currentEmoji={task.emoji || generateEmoji(task.title)}
-              onSelect={(emoji) => {
-                onUpdateTaskEmoji(task.id, emoji)
-                setEmojiPickerTaskId(null)
-              }}
-              onClose={() => setEmojiPickerTaskId(null)}
-            />
-          )}
-        </AnimatePresence>
+        {onUpdateTaskEmoji && (
+          <NativeEmojiPicker
+            isOpen={emojiPickerTaskId === task.id}
+            currentEmoji={task.emoji || generateEmoji(task.title)}
+            onSelect={(emoji) => {
+              onUpdateTaskEmoji(task.id, emoji)
+              setEmojiPickerTaskId(null)
+            }}
+            onClose={() => setEmojiPickerTaskId(null)}
+          />
+        )}
       </div>
 
       {/* Task Content */}
@@ -384,18 +383,17 @@ export default function ProjectView({
             >
               {project.emoji || generateEmoji(project.name)}
             </button>
-            <AnimatePresence>
-              {showProjectEmojiPicker && onUpdateProjectEmoji && (
-                <EmojiPicker
-                  currentEmoji={project.emoji || generateEmoji(project.name)}
-                  onSelect={(emoji) => {
-                    onUpdateProjectEmoji(project.id, emoji)
-                    setShowProjectEmojiPicker(false)
-                  }}
-                  onClose={() => setShowProjectEmojiPicker(false)}
-                />
-              )}
-            </AnimatePresence>
+            {onUpdateProjectEmoji && (
+              <NativeEmojiPicker
+                isOpen={showProjectEmojiPicker}
+                currentEmoji={project.emoji || generateEmoji(project.name)}
+                onSelect={(emoji) => {
+                  onUpdateProjectEmoji(project.id, emoji)
+                  setShowProjectEmojiPicker(false)
+                }}
+                onClose={() => setShowProjectEmojiPicker(false)}
+              />
+            )}
             {project.name}
           </h1>
 

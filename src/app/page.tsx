@@ -442,22 +442,14 @@ export default function Home() {
       return task.project_id === projectId
     }
 
-    switch (activeView) {
-      case 'today':
-        return task.schedule === 'today' && task.status !== 'completed'
-      case 'this_week':
-        return task.schedule === 'this_week' && task.status !== 'completed'
-      case 'next_week':
-        return task.schedule === 'next_week' && task.status !== 'completed'
-      case 'anytime':
-        return task.schedule === 'anytime' && task.status !== 'completed'
-      case 'someday':
-        return task.schedule === 'someday' && task.status !== 'completed'
-      case 'logbook':
-        return task.status === 'completed'
-      default:
-        return false
-    }
+    const view = activeView as string
+    if (view === 'today') return task.schedule === 'today' && task.status !== 'completed'
+    if (view === 'this_week') return task.schedule === 'this_week' && task.status !== 'completed'
+    if (view === 'next_week') return task.schedule === 'next_week' && task.status !== 'completed'
+    if (view === 'anytime') return task.schedule === 'anytime' && task.status !== 'completed'
+    if (view === 'someday') return task.schedule === 'someday' && task.status !== 'completed'
+    if (view === 'logbook') return task.status === 'completed'
+    return false
   }).sort((a, b) => {
     // Sort logbook by most recently completed/updated first
     if (activeView === 'logbook') {
@@ -768,6 +760,8 @@ export default function Home() {
             onUpdateTaskEmoji={handleUpdateTaskEmoji}
             showSnoozeButton={activeView === 'this_week'}
             onSnoozeAll={handleSnoozeAllToNextWeek}
+            onMoveTaskToProject={handleMoveTaskToProject}
+            onMoveTaskToSchedule={handleMoveTaskToSchedule}
           />
         )}
 

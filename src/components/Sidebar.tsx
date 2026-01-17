@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { Project, Area, Task } from '@/types/database'
 import { generateEmoji } from '@/utils/emoji'
-import EmojiPicker from './EmojiPicker'
+import NativeEmojiPicker from './NativeEmojiPicker'
 
 export type View = 'today' | 'this_week' | 'next_week' | 'anytime' | 'someday' | 'logbook' | `project:${string}`
 
@@ -242,6 +242,7 @@ export default function Sidebar({
                           style={dragOverProject === project.id ? {
                             boxShadow: '0 0 12px rgba(59, 130, 246, 0.25)'
                           } : undefined}
+                          data-drop-project={project.id}
                           className={`w-full flex items-center gap-2 px-3 rounded-xl text-left border transition-colors relative ${
                             activeView === `project:${project.id}`
                               ? 'bg-white border-stone-200 shadow-sm text-stone-900'
@@ -261,18 +262,17 @@ export default function Sidebar({
                           </button>
 
                           {/* Emoji Picker */}
-                          <AnimatePresence>
-                            {emojiPickerProjectId === project.id && onUpdateProjectEmoji && (
-                              <EmojiPicker
-                                currentEmoji={project.emoji || generateEmoji(project.name)}
-                                onSelect={(emoji) => {
-                                  onUpdateProjectEmoji(project.id, emoji)
-                                  setEmojiPickerProjectId(null)
-                                }}
-                                onClose={() => setEmojiPickerProjectId(null)}
-                              />
-                            )}
-                          </AnimatePresence>
+                          {onUpdateProjectEmoji && (
+                            <NativeEmojiPicker
+                              isOpen={emojiPickerProjectId === project.id}
+                              currentEmoji={project.emoji || generateEmoji(project.name)}
+                              onSelect={(emoji) => {
+                                onUpdateProjectEmoji(project.id, emoji)
+                                setEmojiPickerProjectId(null)
+                              }}
+                              onClose={() => setEmojiPickerProjectId(null)}
+                            />
+                          )}
 
                           {/* Project name - clickable for navigation */}
                           <button
@@ -356,6 +356,7 @@ export default function Sidebar({
                         style={dragOverSchedule === item.id ? {
                           boxShadow: '0 0 12px rgba(59, 130, 246, 0.25)'
                         } : undefined}
+                        data-drop-schedule={isDroppable ? item.id : undefined}
                         className={`w-full flex items-center gap-3 px-3 rounded-xl text-left border transition-colors group ${
                           activeView === item.id
                             ? 'bg-white border-stone-200 shadow-sm text-stone-900'
